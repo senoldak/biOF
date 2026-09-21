@@ -130,7 +130,7 @@ Regulatory Designation Boosts added to base score:
 
 Continuous function comparing Target Addressable Market ($\text{TAM}$) to Market Capitalization:
 
-$$\text{Ratio} = \frac{\text{TAM (\$M)}}{\max(\text{MarketCap (\$M)}, 10.0)}$$
+$$\text{Ratio} = \frac{\text{TAM (\text{USD M})}}{\max(\text{MarketCap (\text{USD M})}, 10.0)}$$
 
 $$S_{\text{asym}} = \min\left(100.0, \max\left(0.0, \frac{\text{Ratio}}{5.0} \times 100.0\right)\right)$$
 
@@ -140,7 +140,7 @@ A $5.0\times$ TAM-to-market-cap ratio achieves the maximum score of $100.0$.
 
 Calculated from cash runway in months:
 
-$$\text{Runway} = \frac{\text{Cash \& Short-Term Investments (\$M)}}{\max\left(\frac{\text{Quarterly Burn (\$M)}}{3}, 0.01\right)}$$
+$$\text{Runway} = \frac{\text{Cash and Short-Term Investments (\text{USD M})}}{\max\left(\frac{\text{Quarterly Burn (\text{USD M})}}{3}, 0.01\right)}$$
 
 - $\text{Runway} < 6\text{ months}$: $S_{\text{fin}} = \max\left(0.0, \frac{\text{Runway}}{6.0} \times 25.0\right)$, with **`dilution_flag = True`** (triggers ⚠️ DILUTION RISK alert).
 - $6 \le \text{Runway} < 12\text{ months}$: $S_{\text{fin}} = 25.0 + \left(\frac{\text{Runway} - 6.0}{6.0}\right) \times 35.0$
