@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
+import logging
 from fastapi import APIRouter
 from bioseeder.api.schemas import LiveFeedResponse, LiveFeedItemSchema
+from bioseeder.collectors.openfda import OpenFDACollector
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory circular buffer for simulated and real-time live events
-LIVE_FEED_STORE = [
+# Fallback curated regulatory events
+CURATED_FALLBACK = [
     LiveFeedItemSchema(
         id="evt-001",
         timestamp=datetime.now(timezone.utc),
@@ -56,5 +59,45 @@ LIVE_FEED_STORE = [
 
 @router.get("/approvals/live", response_model=LiveFeedResponse)
 async def get_live_approvals_feed():
-    """Retrieve the latest live regulatory approvals, CRLs, and AdCom feed."""
-    return LiveFeedResponse(feed=LIVE_FEED_STORE)
+    """Retrieve the latest live regulatory approvals from openFDA, augmented with key biotech events."""
+    try:
+        collector = OpenFDACollector()
+        records = await collector.fetch_drug_approvals(limit=10)
+        live_items = []
+
+        for idx, rec in enumerate(records):
+            sponsor = rec.get("sponsor_name") or "FDA REGULATORY"
+            brand = rec.get("brand_name") or rec.get("active_ingredient") or "Therapeutic Product"
+            sub_type = rec.get("submission_type") or "NDA/BLA"
+            app_no = rec.get("application_number") or ""
+            app_date = rec.get("approval_date")
+            ts = datetime.now(timezone.utc)
+            if app_date:
+                try:
+                    ts = datetime(app_date.year, app_date.month, app_date.day, tzinfo=timezone.utc)
+                except Exception:
+                    pass
+
+            headline = f"FDA Action on {brand}: {sub_type} Review Recorded"
+            details = f"Sponsor: {sponsor}. Application: {app_no}. Status: {rec.get('submission_status', 'APPROVED')}."
+
+            live_items.append(
+                LiveFeedItemSchema(
+                    id=f"fda-{app_no or idx}",
+                    timestamp=ts,
+                    category="APPROVAL",
+                    headline=headline,
+                    ticker="FDA",
+                    details=details,
+                    sentiment="POSITIVE",
+                )
+            )
+
+        # Merge live FDA approvals with high-conviction curated catalysts for rich variety
+        combined = (live_items[:6] + CURATED_FALLBACK) if live_items else CURATED_FALLBACK
+        return LiveFeedResponse(feed=combined)
+
+    except Exception as exc:
+        logger.warning("Failed to fetch live openFDA approvals, falling back: %s", exc)
+        return LiveFeedResponse(feed=CURATED_FALLBACK)
+

@@ -1,4 +1,4 @@
-const escapeHtml = window.escapeHtml || (window.escapeHtml = function(str) {
+window.escapeHtml = window.escapeHtml || function(str) {
   if (str === null || str === undefined) return "";
   return String(str)
     .replace(/&/g, "&amp;")
@@ -6,7 +6,8 @@ const escapeHtml = window.escapeHtml || (window.escapeHtml = function(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-});
+};
+var escapeHtml = window.escapeHtml;
 
 // BioSeeder Live Regulatory Ticker Tape & Feed Component
 class TickerManager {

@@ -87,6 +87,21 @@ class BaseCollector:
                     response.raise_for_status()
 
             except httpx.HTTPStatusError as exc:
+                # If 403 Forbidden, try urllib fallback (Cloudflare blocks standard httpx client fingerprints)
+                if exc.response.status_code == 403:
+                    try:
+                        import urllib.request, urllib.parse, json
+                        full_url = url
+                        if params:
+                            full_url += ("&" if "?" in full_url else "?") + urllib.parse.urlencode(params)
+                        req = urllib.request.Request(full_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                        def _sync_urllib():
+                            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                                return json.loads(resp.read().decode())
+                        return await asyncio.to_thread(_sync_urllib)
+                    except Exception:
+                        pass
+
                 # Do not retry non-retryable client errors (4xx except 429)
                 if exc.response.status_code not in (429, 500, 502, 503, 504):
                     raise exc

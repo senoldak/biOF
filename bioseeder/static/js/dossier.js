@@ -1,4 +1,4 @@
-const escapeHtml = window.escapeHtml || (window.escapeHtml = function(str) {
+window.escapeHtml = window.escapeHtml || function(str) {
   if (str === null || str === undefined) return "";
   return String(str)
     .replace(/&/g, "&amp;")
@@ -6,7 +6,8 @@ const escapeHtml = window.escapeHtml || (window.escapeHtml = function(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-});
+};
+var escapeHtml = window.escapeHtml;
 
 // BioSeeder Company & Pipeline Dossier Modal Manager
 class DossierManager {
@@ -47,6 +48,18 @@ class DossierManager {
       if (!res.ok) throw new Error("Failed to load dossier");
       const comp = await res.json();
       this.render(comp);
+
+      // Render TradingView chart inside modal
+      const tvContainer = document.getElementById("modal-tv-widget-container");
+      if (tvContainer) {
+        tvContainer.innerHTML = "";
+        const iframe = document.createElement("iframe");
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.border = "none";
+        iframe.src = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget_modal&symbol=${encodeURIComponent(ticker)}&interval=D&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=0a0e17&studies=%5B%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=localhost`;
+        tvContainer.appendChild(iframe);
+      }
     } catch (err) {
       this.nameEl.textContent = "Error loading company dossier";
       this.pipelineListEl.innerHTML = `<div style="color: var(--accent-crimson); padding: 20px;">${escapeHtml(err.message)}</div>`;
@@ -55,6 +68,8 @@ class DossierManager {
 
   close() {
     if (this.modal) this.modal.classList.remove("open");
+    const tvContainer = document.getElementById("modal-tv-widget-container");
+    if (tvContainer) tvContainer.innerHTML = "";
   }
 
   render(comp) {
@@ -170,7 +185,7 @@ class DossierManager {
         const breakdown = cat.score_breakdown || {};
 
         return `
-        <div class="kpi-card" style="margin-bottom: 8px; border-left: 3px solid var(--accent-cyan);">
+        <div class="kpi-card" style="margin-bottom: 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-xs);">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <strong style="font-size: 13px; color: var(--text-primary);">${catTypeSafe} — ${catDrugSafe}</strong>
             <span class="countdown-timer">${catCountdown} (${catDateSafe})</span>

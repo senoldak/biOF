@@ -1,4 +1,4 @@
-const escapeHtml = window.escapeHtml || (window.escapeHtml = function(str) {
+window.escapeHtml = window.escapeHtml || function(str) {
   if (str === null || str === undefined) return "";
   return String(str)
     .replace(/&/g, "&amp;")
@@ -6,14 +6,147 @@ const escapeHtml = window.escapeHtml || (window.escapeHtml = function(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-});
+};
+var escapeHtml = window.escapeHtml;
 
 // BioSeeder Catalyst Calendar & Table Renderer
 class CalendarManager {
   constructor() {
     this.tableBody = document.getElementById("catalysts-table-body");
     this.screenerBody = document.getElementById("screener-table-body");
+    this.currentItems = [];
+    this.sortColumn = null;
+    this.sortDirection = "asc"; // "asc" or "desc"
+
+    this.currentScreenerItems = [];
+    this.screenerSortColumn = null;
+    this.screenerSortDirection = "asc";
+
     this.initClickHandlers();
+    this.initSortHandlers();
+    this.initScreenerSortHandlers();
+  }
+
+  initSortHandlers() {
+    document.querySelectorAll(".sortable-th").forEach(th => {
+      th.addEventListener("click", () => {
+        const column = th.dataset.sort;
+        if (this.sortColumn === column) {
+          this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc";
+        } else {
+          this.sortColumn = column;
+          this.sortDirection = (column === "score" || column === "runway" || column === "target_date") ? "desc" : "asc";
+        }
+        this.updateSortHeaders();
+        this.renderSortedCatalysts();
+      });
+    });
+  }
+
+  initScreenerSortHandlers() {
+    document.querySelectorAll(".sortable-screener-th").forEach(th => {
+      th.addEventListener("click", () => {
+        const column = th.dataset.sort;
+        if (this.screenerSortColumn === column) {
+          this.screenerSortDirection = this.screenerSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          this.screenerSortColumn = column;
+          // default descending for scores/financial metrics
+          const descDefault = ["composite_score", "proximity", "pos", "asymmetry", "runway", "market_cap"];
+          this.screenerSortDirection = descDefault.includes(column) ? "desc" : "asc";
+        }
+        this.updateScreenerSortHeaders();
+        this.renderSortedScreener();
+      });
+    });
+  }
+
+  updateScreenerSortHeaders() {
+    document.querySelectorAll(".sortable-screener-th").forEach(th => {
+      const col = th.dataset.sort;
+      const icon = th.querySelector(".sort-icon");
+      th.classList.remove("sorted-asc", "sorted-desc");
+      if (col === this.screenerSortColumn) {
+        th.classList.add(this.screenerSortDirection === "asc" ? "sorted-asc" : "sorted-desc");
+        if (icon) icon.textContent = this.screenerSortDirection === "asc" ? "▲" : "▼";
+      } else {
+        if (icon) icon.textContent = "⇅";
+      }
+    });
+  }
+
+  updateSortHeaders() {
+    document.querySelectorAll(".sortable-th").forEach(th => {
+      const col = th.dataset.sort;
+      const icon = th.querySelector(".sort-icon");
+      th.classList.remove("sorted-asc", "sorted-desc");
+      if (col === this.sortColumn) {
+        th.classList.add(this.sortDirection === "asc" ? "sorted-asc" : "sorted-desc");
+        if (icon) icon.textContent = this.sortDirection === "asc" ? "▲" : "▼";
+      } else {
+        if (icon) icon.textContent = "⇅";
+      }
+    });
+  }
+
+  renderSortedCatalysts() {
+    if (!this.currentItems || this.currentItems.length === 0) {
+      this.drawCatalystsTable([]);
+      return;
+    }
+
+    let items = [...this.currentItems];
+    if (this.sortColumn) {
+      items.sort((a, b) => {
+        let valA, valB;
+        switch (this.sortColumn) {
+          case "ticker":
+            valA = (a.ticker || "").toLowerCase();
+            valB = (b.ticker || "").toLowerCase();
+            break;
+          case "company_asset":
+            valA = ((a.drug_name || "") + (a.company_name || "")).toLowerCase();
+            valB = ((b.drug_name || "") + (b.company_name || "")).toLowerCase();
+            break;
+          case "indication":
+            valA = (a.indication || "").toLowerCase();
+            valB = (b.indication || "").toLowerCase();
+            break;
+          case "phase":
+            valA = (a.phase || "").toLowerCase();
+            valB = (b.phase || "").toLowerCase();
+            break;
+          case "catalyst_type":
+            valA = (a.catalyst_type || "").toLowerCase();
+            valB = (b.catalyst_type || "").toLowerCase();
+            break;
+          case "target_date":
+            valA = a.target_date || "";
+            valB = b.target_date || "";
+            break;
+          case "countdown":
+            valA = a.days_to_event ?? 99999;
+            valB = b.days_to_event ?? 99999;
+            break;
+          case "score":
+            valA = a.bio_alpha_score ?? -1;
+            valB = b.bio_alpha_score ?? -1;
+            break;
+          case "runway":
+            valA = a.cash_runway_months ?? -1;
+            valB = b.cash_runway_months ?? -1;
+            break;
+          default:
+            return 0;
+        }
+
+        if (valA < valB) return this.sortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return this.sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    this.drawCatalystsTable(items);
   }
 
   initClickHandlers() {
@@ -42,6 +175,11 @@ class CalendarManager {
   }
 
   renderCatalysts(items) {
+    this.currentItems = items || [];
+    this.renderSortedCatalysts();
+  }
+
+  drawCatalystsTable(items) {
     if (!this.tableBody) return;
 
     if (items.length === 0) {
@@ -127,6 +265,84 @@ class CalendarManager {
   }
 
   renderScreener(items) {
+    this.currentScreenerItems = items || [];
+    this.renderSortedScreener();
+  }
+
+  renderSortedScreener() {
+    if (!this.currentScreenerItems || this.currentScreenerItems.length === 0) {
+      this.drawScreenerTable([]);
+      return;
+    }
+
+    let items = [...this.currentScreenerItems];
+    if (this.screenerSortColumn) {
+      items.sort((a, b) => {
+        let valA, valB;
+        switch (this.screenerSortColumn) {
+          case "rank":
+            valA = a.composite_score ?? -1;
+            valB = b.composite_score ?? -1;
+            // higher composite score = rank #1
+            return this.screenerSortDirection === "asc" ? (valB - valA) : (valA - valB);
+          case "ticker":
+            valA = (a.ticker || "").toLowerCase();
+            valB = (b.ticker || "").toLowerCase();
+            break;
+          case "asset_indication":
+            valA = ((a.drug_name || "") + (a.indication || "")).toLowerCase();
+            valB = ((b.drug_name || "") + (b.indication || "")).toLowerCase();
+            break;
+          case "phase":
+            valA = (a.phase || "").toLowerCase();
+            valB = (b.phase || "").toLowerCase();
+            break;
+          case "target_date":
+            valA = a.target_date || "";
+            valB = b.target_date || "";
+            break;
+          case "market_cap":
+            valA = a.market_cap ?? -1;
+            valB = b.market_cap ?? -1;
+            break;
+          case "runway":
+            valA = a.cash_runway_months ?? -1;
+            valB = b.cash_runway_months ?? -1;
+            break;
+          case "composite_score":
+            valA = a.composite_score ?? -1;
+            valB = b.composite_score ?? -1;
+            break;
+          case "proximity":
+            valA = a.proximity_score ?? -1;
+            valB = b.proximity_score ?? -1;
+            break;
+          case "pos":
+            valA = a.pos_score ?? -1;
+            valB = b.pos_score ?? -1;
+            break;
+          case "asymmetry":
+            valA = a.asymmetry_score ?? -1;
+            valB = b.asymmetry_score ?? -1;
+            break;
+          case "dilution":
+            valA = a.dilution_flag ? 1 : 0;
+            valB = b.dilution_flag ? 1 : 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (valA < valB) return this.screenerSortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return this.screenerSortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    this.drawScreenerTable(items);
+  }
+
+  drawScreenerTable(items) {
     if (!this.screenerBody) return;
 
     if (items.length === 0) {
